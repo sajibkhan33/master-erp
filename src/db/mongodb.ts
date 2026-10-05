@@ -22,7 +22,7 @@ const RestaurantStateSchema = new Schema<IRestaurantState>(
       type: String,
       required: true,
       unique: true,
-      default: "default_cafe_banani",
+      default: "default_master_erp",
       index: true
     },
     data: {

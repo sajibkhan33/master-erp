@@ -11,7 +11,7 @@ import { connectToDatabase, isDbConnected, getLastDbError, RestaurantStateModel 
 dotenv.config();
 
 const STATE_FILE = path.join(process.cwd(), "restaurant_data.json");
-const STATE_KEY = "default_cafe_banani";
+const STATE_KEY = "default_master_erp";
 let cachedState: any = null;
 let lastServerUpdate = 0;
 let isLoadedFromMongo = false;
