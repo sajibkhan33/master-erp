@@ -2159,7 +2159,7 @@ export const HeadsConfigView: React.FC = () => {
             <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between text-emerald-900 font-bold text-sm shadow-xs animate-in slide-in-from-top">
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span>টেবিল অর্ডার নেওয়ার পদ্ধতি সফলভাবে সেভ হয়েছে!</span>
+                <span>Table Order Flow configuration saved successfully!</span>
               </div>
               <span className="text-xs bg-emerald-200/80 px-2.5 py-1 rounded-lg font-bold">Active Everywhere</span>
             </div>
@@ -2173,22 +2173,22 @@ export const HeadsConfigView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-slate-900">
-                    POS Table Click & Order Taking Workflow (টেবিল ক্লিক ও অর্ডার নেওয়ার পদ্ধতি)
+                    POS Table Click & Order Taking Workflow
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    পিওএস ফ্লোর প্ল্যানে খালি টেবিলে ক্লিক করলে কোন পদ্ধতিতে অর্ডার নেওয়া শুরু হবে তা পছন্দ করুন
+                    Choose what happens when staff or cashier clicks on an empty / free table on the POS floor plan
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">বর্তমান মোড:</span>
+                <span className="text-xs font-bold text-slate-500">Current Mode:</span>
                 <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${
                   (profileForm.tableOrderFlow || 'modal') === 'modal'
                     ? 'bg-blue-100 text-[#004b9b] border border-blue-200'
                     : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                 }`}>
-                  {(profileForm.tableOrderFlow || 'modal') === 'modal' ? '১. পপ-আপ মোড (Modal First)' : '২. ডিরেক্ট পিওএস (Direct Screen)'}
+                  {(profileForm.tableOrderFlow || 'modal') === 'modal' ? 'Option 1: Modal First' : 'Option 2: Direct POS Screen'}
                 </span>
               </div>
             </div>
@@ -2206,7 +2206,7 @@ export const HeadsConfigView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-100 text-[#004b9b] border border-blue-200 flex items-center gap-1">
-                      <span>অপশন ১ (Modal First)</span>
+                      <span>Option 1 (Modal First)</span>
                     </span>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       (profileForm.tableOrderFlow || 'modal') === 'modal'
@@ -2218,10 +2218,10 @@ export const HeadsConfigView: React.FC = () => {
                   </div>
 
                   <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
-                    <span>১. ওয়েটার ও কাস্টমার পপ-আপ উইন্ডো (Step 1 Modal)</span>
+                    <span>1. Waiter & Customer Modal Dialog (Popup First)</span>
                   </h4>
                   <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                    টেবিলে ক্লিক করলে প্রথমে একটি পপ-আপ ডায়ালগ আসবে যেখানে ওয়েটার ও কাস্টমার সিলেক্ট করতে হবে, এরপর 'Take Order' চাপলে মেনু স্ক্রিন ওপেন হবে।
+                    Clicking a table opens a modal dialog to select Waiter and Customer/Channel first before navigating to the menu order screen.
                   </p>
 
                   {/* Visual Preview Box */}
@@ -2248,10 +2248,10 @@ export const HeadsConfigView: React.FC = () => {
                   <span>Standard Dine-in Service</span>
                   {(profileForm.tableOrderFlow || 'modal') === 'modal' ? (
                     <span className="text-emerald-600 flex items-center gap-1 font-black">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> নির্বাচিত মোড (Active)
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Active Mode
                     </span>
                   ) : (
-                    <span className="text-slate-400 group-hover:text-slate-700">ক্লিক করে সিলেক্ট করুন</span>
+                    <span className="text-slate-400 group-hover:text-slate-700">Click to Select</span>
                   )}
                 </div>
               </div>
@@ -2268,7 +2268,7 @@ export const HeadsConfigView: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                      <span>অপশন ২ (Direct POS)</span>
+                      <span>Option 2 (Direct POS)</span>
                     </span>
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                       profileForm.tableOrderFlow === 'direct'
@@ -2280,10 +2280,10 @@ export const HeadsConfigView: React.FC = () => {
                   </div>
 
                   <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
-                    <span>২. সরাসরি ১-ক্লিক পিওএস অর্ডার স্ক্রিন (Direct Screen)</span>
+                    <span>2. Direct 1-Click POS Order Screen (Instant Open)</span>
                   </h4>
                   <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                    টেবিলে ক্লিক করার সাথে সাথে কোনো পপ-আপ ছাড়া সরাসরি মেনু ও কার্ট স্ক্রিন ওপেন হয়ে যাবে। ভেতরে ইচ্ছেমতো অর্ডার নেওয়া ও ওয়েটার এসাইন করা যাবে।
+                    Clicking a table opens the POS order taking screen directly with menu and cart. Waiter can be assigned at any time via the "Assign Waiter" button inside.
                   </p>
 
                   {/* Visual Preview Box */}
@@ -2308,10 +2308,10 @@ export const HeadsConfigView: React.FC = () => {
                   <span>Fast Counter & Express Mode</span>
                   {profileForm.tableOrderFlow === 'direct' ? (
                     <span className="text-emerald-600 flex items-center gap-1 font-black">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> নির্বাচিত মোড (Active)
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Active Mode
                     </span>
                   ) : (
-                    <span className="text-slate-400 group-hover:text-slate-700">ক্লিক করে সিলেক্ট করুন</span>
+                    <span className="text-slate-400 group-hover:text-slate-700">Click to Select</span>
                   )}
                 </div>
               </div>
@@ -2319,7 +2319,7 @@ export const HeadsConfigView: React.FC = () => {
 
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
-                💡 টিপস: আপনি যেকোনো কার্ডে ক্লিক করে পছন্দের মোড সক্রিয় করতে পারেন। এটি স্বয়ংক্রিয়ভাবে ডাটাবেজ ও সমস্ত সিস্টেমে কার্যকর হবে।
+                💡 Tip: Click either card to toggle your preferred workflow. Changes sync immediately to MongoDB and across all active POS terminals.
               </p>
               <button
                 type="button"
