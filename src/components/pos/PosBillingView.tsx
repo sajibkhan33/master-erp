@@ -689,7 +689,12 @@ export const PosBillingView: React.FC = () => {
                         setIsStartSessionModalOpen(true);
                         return;
                       }
-                      selectTable(table.id);
+                      const flow = data.restaurantProfile?.tableOrderFlow || 'modal';
+                      if (flow === 'direct') {
+                        selectTable(table.id);
+                      } else {
+                        setAssigningTable(table);
+                      }
                     }
                   }}
                   className={`${cardPadding} border-2 transition-all duration-150 flex flex-col justify-between relative overflow-hidden group shadow-xs hover:shadow-md select-none ${

@@ -74,7 +74,7 @@ export const HeadsConfigView: React.FC = () => {
     t
   } = useRestaurant();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat'>(() => {
+  const [activeTab, setActiveTab] = useState<'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat' | 'orderFlow'>(() => {
     if (activeSubNav === 'coa' || activeSubNav === 'chart-of-accounts') return 'coa';
     if (activeSubNav === 'payments' || activeSubNav === 'payment-methods') return 'payments';
     if (activeSubNav === 'heads') return 'heads';
@@ -82,6 +82,7 @@ export const HeadsConfigView: React.FC = () => {
     if (activeSubNav === 'printers') return 'printers';
     if (activeSubNav === 'templates') return 'templates';
     if (activeSubNav === 'vat' || activeSubNav === 'vat-tax') return 'vat';
+    if (activeSubNav === 'orderFlow' || activeSubNav === 'flow' || activeSubNav === 'order-flow') return 'orderFlow';
     return 'profile';
   });
 
@@ -102,12 +103,14 @@ export const HeadsConfigView: React.FC = () => {
       setActiveTab('templates');
     } else if (activeSubNav === 'vat' || activeSubNav === 'vat-tax') {
       setActiveTab('vat');
+    } else if (activeSubNav === 'orderFlow' || activeSubNav === 'flow' || activeSubNav === 'order-flow') {
+      setActiveTab('orderFlow');
     } else if (!activeSubNav) {
       setActiveTab('profile');
     }
   }, [activeSubNav]);
 
-  const switchTab = (tab: 'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat') => {
+  const switchTab = (tab: 'profile' | 'heads' | 'coa' | 'agents' | 'printers' | 'templates' | 'payments' | 'vat' | 'orderFlow') => {
     setActiveTab(tab);
     setActiveSubNav(tab);
   };
@@ -146,10 +149,12 @@ export const HeadsConfigView: React.FC = () => {
     currencySymbol: data.restaurantProfile?.currencySymbol || '৳',
     vatPercent: data.restaurantProfile?.vatPercent ?? 5,
     vatMode: data.restaurantProfile?.vatMode || 'inclusive',
-    enableVat: data.restaurantProfile?.enableVat ?? true
+    enableVat: data.restaurantProfile?.enableVat ?? true,
+    tableOrderFlow: data.restaurantProfile?.tableOrderFlow || 'modal'
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [vatSavedSuccess, setVatSavedSuccess] = useState(false);
+  const [flowSavedSuccess, setFlowSavedSuccess] = useState(false);
 
   React.useEffect(() => {
     if (data.restaurantProfile) {
@@ -167,10 +172,22 @@ export const HeadsConfigView: React.FC = () => {
         currencySymbol: data.restaurantProfile?.currencySymbol || prev.currencySymbol,
         vatPercent: data.restaurantProfile?.vatPercent ?? prev.vatPercent,
         vatMode: data.restaurantProfile?.vatMode || prev.vatMode,
-        enableVat: data.restaurantProfile?.enableVat ?? prev.enableVat
+        enableVat: data.restaurantProfile?.enableVat ?? prev.enableVat,
+        tableOrderFlow: data.restaurantProfile?.tableOrderFlow || prev.tableOrderFlow || 'modal'
       }));
     }
   }, [data.restaurantProfile]);
+
+  const handleSaveFlow = (flowMode: 'modal' | 'direct') => {
+    setProfileForm(prev => ({ ...prev, tableOrderFlow: flowMode }));
+    updateRestaurantProfile({
+      tableOrderFlow: flowMode
+    });
+    setFlowSavedSuccess(true);
+    setTimeout(() => {
+      setFlowSavedSuccess(false);
+    }, 3000);
+  };
 
   const handleSaveVatPage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -843,6 +860,19 @@ export const HeadsConfigView: React.FC = () => {
             >
               <Percent className="w-3.5 h-3.5" />
               <span>VAT & Tax Configuration</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('orderFlow')}
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-2 ${
+                activeTab === 'orderFlow'
+                  ? 'bg-[#004b9b] text-white shadow-xs font-black'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Table Click & POS Order Taking Flow (2 Modes)"
+            >
+              <Utensils className="w-3.5 h-3.5" />
+              <span>Table Order Flow (2 Modes)</span>
             </button>
           </div>
         </div>
@@ -2119,6 +2149,188 @@ export const HeadsConfigView: React.FC = () => {
               </div>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Table Order Flow Configuration Tab (Mode 1 vs Mode 2) */}
+      {activeTab === 'orderFlow' && (
+        <div className="space-y-6 animate-in fade-in">
+          {flowSavedSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between text-emerald-900 font-bold text-sm shadow-xs animate-in slide-in-from-top">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span>টেবিল অর্ডার নেওয়ার পদ্ধতি সফলভাবে সেভ হয়েছে!</span>
+              </div>
+              <span className="text-xs bg-emerald-200/80 px-2.5 py-1 rounded-lg font-bold">Active Everywhere</span>
+            </div>
+          )}
+
+          <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 border border-blue-200 text-[#004b9b] rounded-xl">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    POS Table Click & Order Taking Workflow (টেবিল ক্লিক ও অর্ডার নেওয়ার পদ্ধতি)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    পিওএস ফ্লোর প্ল্যানে খালি টেবিলে ক্লিক করলে কোন পদ্ধতিতে অর্ডার নেওয়া শুরু হবে তা পছন্দ করুন
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">বর্তমান মোড:</span>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-black ${
+                  (profileForm.tableOrderFlow || 'modal') === 'modal'
+                    ? 'bg-blue-100 text-[#004b9b] border border-blue-200'
+                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                }`}>
+                  {(profileForm.tableOrderFlow || 'modal') === 'modal' ? '১. পপ-আপ মোড (Modal First)' : '২. ডিরেক্ট পিওএস (Direct Screen)'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Option 1: Waiter & Customer Modal Dialog First */}
+              <div
+                onClick={() => handleSaveFlow('modal')}
+                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden group ${
+                  (profileForm.tableOrderFlow || 'modal') === 'modal'
+                    ? 'border-[#004b9b] bg-blue-50/40 shadow-md ring-2 ring-blue-400/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-100 text-[#004b9b] border border-blue-200 flex items-center gap-1">
+                      <span>অপশন ১ (Modal First)</span>
+                    </span>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      (profileForm.tableOrderFlow || 'modal') === 'modal'
+                        ? 'border-[#004b9b] bg-[#004b9b] text-white'
+                        : 'border-slate-300 bg-white'
+                    }`}>
+                      {(profileForm.tableOrderFlow || 'modal') === 'modal' && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </div>
+
+                  <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
+                    <span>১. ওয়েটার ও কাস্টমার পপ-আপ উইন্ডো (Step 1 Modal)</span>
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                    টেবিলে ক্লিক করলে প্রথমে একটি পপ-আপ ডায়ালগ আসবে যেখানে ওয়েটার ও কাস্টমার সিলেক্ট করতে হবে, এরপর 'Take Order' চাপলে মেনু স্ক্রিন ওপেন হবে।
+                  </p>
+
+                  {/* Visual Preview Box */}
+                  <div className="p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-90 shadow-inner">
+                    <div className="flex items-center justify-between text-[11px] text-blue-300 pb-1 border-b border-slate-800">
+                      <span className="font-bold">Table 05 (Floor 2)</span>
+                      <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-200 border border-blue-800">Popup Modal</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300 flex items-center gap-1">
+                      <span>👤 Select Waiter:</span>
+                      <span className="text-amber-300">[-- Choose Waiter --]</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300 flex items-center gap-1">
+                      <span>👥 Customer / Agent:</span>
+                      <span className="text-slate-400">[-- Choose Customer --]</span>
+                    </div>
+                    <div className="pt-1 flex justify-end">
+                      <span className="px-2 py-0.5 rounded bg-[#004b9b] text-white text-[10px] font-bold">Take Order →</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-[#004b9b]">
+                  <span>Standard Dine-in Service</span>
+                  {(profileForm.tableOrderFlow || 'modal') === 'modal' ? (
+                    <span className="text-emerald-600 flex items-center gap-1 font-black">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> নির্বাচিত মোড (Active)
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 group-hover:text-slate-700">ক্লিক করে সিলেক্ট করুন</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Option 2: Direct POS Order Screen */}
+              <div
+                onClick={() => handleSaveFlow('direct')}
+                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden group ${
+                  profileForm.tableOrderFlow === 'direct'
+                    ? 'border-emerald-600 bg-emerald-50/40 shadow-md ring-2 ring-emerald-400/20'
+                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <span>অপশন ২ (Direct POS)</span>
+                    </span>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                      profileForm.tableOrderFlow === 'direct'
+                        ? 'border-emerald-600 bg-emerald-600 text-white'
+                        : 'border-slate-300 bg-white'
+                    }`}>
+                      {profileForm.tableOrderFlow === 'direct' && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </div>
+
+                  <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
+                    <span>২. সরাসরি ১-ক্লিক পিওএস অর্ডার স্ক্রিন (Direct Screen)</span>
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                    টেবিলে ক্লিক করার সাথে সাথে কোনো পপ-আপ ছাড়া সরাসরি মেনু ও কার্ট স্ক্রিন ওপেন হয়ে যাবে। ভেতরে ইচ্ছেমতো অর্ডার নেওয়া ও ওয়েটার এসাইন করা যাবে।
+                  </p>
+
+                  {/* Visual Preview Box */}
+                  <div className="p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-90 shadow-inner">
+                    <div className="flex items-center justify-between text-[11px] text-emerald-300 pb-1 border-b border-slate-800">
+                      <span className="font-bold">POS Terminal Screen</span>
+                      <span className="text-[10px] bg-emerald-950 px-1.5 py-0.5 rounded text-emerald-200 border border-emerald-800">1-Click Direct</span>
+                    </div>
+                    <div className="text-[10px] text-slate-300 flex justify-between">
+                      <span>[Menu: Food / Drinks / Steaks]</span>
+                      <span className="text-amber-300">[Table Cart]</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">⚡ Instant item addition without pop-up</div>
+                    <div className="pt-1 flex justify-between items-center">
+                      <span className="text-[9px] text-slate-400">Optional: "Assign Waiter" inside</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">Live POS</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-emerald-700">
+                  <span>Fast Counter & Express Mode</span>
+                  {profileForm.tableOrderFlow === 'direct' ? (
+                    <span className="text-emerald-600 flex items-center gap-1 font-black">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> নির্বাচিত মোড (Active)
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 group-hover:text-slate-700">ক্লিক করে সিলেক্ট করুন</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">
+                💡 টিপস: আপনি যেকোনো কার্ডে ক্লিক করে পছন্দের মোড সক্রিয় করতে পারেন। এটি স্বয়ংক্রিয়ভাবে ডাটাবেজ ও সমস্ত সিস্টেমে কার্যকর হবে।
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSaveFlow(profileForm.tableOrderFlow || 'modal')}
+                className="px-5 py-2.5 bg-[#004b9b] hover:bg-[#003875] text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center justify-center gap-2 shrink-0"
+              >
+                <Check className="w-4 h-4" />
+                <span>Save Workflow Settings</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {/* Commission Agent Add / Edit Modal */}

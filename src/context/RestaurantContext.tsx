@@ -765,7 +765,8 @@ export const DEFAULT_RESTAURANT_PROFILE: RestaurantProfile = {
   outletSecurityKey: "BDHOSTT-2026",
   vatPercent: 5,
   vatMode: "inclusive",
-  enableVat: true
+  enableVat: true,
+  tableOrderFlow: "modal"
 };
 
 export const DEFAULT_EMPLOYEES: Employee[] = [

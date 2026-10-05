@@ -690,6 +690,7 @@ export interface RestaurantProfile {
   vatPercent?: number; // Dynamic VAT rate (e.g. 5, 7.5, 10, 15, 0)
   vatMode?: 'inclusive' | 'exclusive'; // default 'inclusive'
   enableVat?: boolean; // toggle auto-VAT on/off
+  tableOrderFlow?: 'modal' | 'direct'; // 'modal': Waiter & Customer modal prompt first (Mode 1), 'direct': Direct POS screen (Mode 2)
 }
 
 export interface AppData {
