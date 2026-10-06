@@ -155,6 +155,7 @@ export const HeadsConfigView: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [vatSavedSuccess, setVatSavedSuccess] = useState(false);
   const [flowSavedSuccess, setFlowSavedSuccess] = useState(false);
+  const [expandedPreview, setExpandedPreview] = useState<'modal' | 'direct' | null>(null);
 
   React.useEffect(() => {
     if (data.restaurantProfile) {
@@ -2193,133 +2194,255 @@ export const HeadsConfigView: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Option 1: Waiter & Customer Modal Dialog First */}
-              <div
-                onClick={() => handleSaveFlow('modal')}
-                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden group ${
-                  (profileForm.tableOrderFlow || 'modal') === 'modal'
-                    ? 'border-[#004b9b] bg-blue-50/40 shadow-md ring-2 ring-blue-400/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-100 text-[#004b9b] border border-blue-200 flex items-center gap-1">
-                      <span>Option 1 (Modal First)</span>
-                    </span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+            {/* Table Order Flow Options Table (Styled like Image 2 Rows) */}
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl shadow-2xs">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-900 text-slate-300 border-b border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4 font-bold text-center w-12">#</th>
+                    <th className="py-3.5 px-4 font-bold w-48">Workflow Mode</th>
+                    <th className="py-3.5 px-4 font-bold min-w-[280px]">Mode Name & Workflow Description</th>
+                    <th className="py-3.5 px-4 font-bold w-44">Service Category</th>
+                    <th className="py-3.5 px-4 font-bold min-w-[260px]">Order Flow / Step Sequence</th>
+                    <th className="py-3.5 px-4 font-bold text-center w-36">Status</th>
+                    <th className="py-3.5 px-4 font-bold text-center w-36">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {/* Option 1 Row */}
+                  <tr
+                    onClick={() => handleSaveFlow('modal')}
+                    className={`transition cursor-pointer select-none ${
                       (profileForm.tableOrderFlow || 'modal') === 'modal'
-                        ? 'border-[#004b9b] bg-[#004b9b] text-white'
-                        : 'border-slate-300 bg-white'
-                    }`}>
-                      {(profileForm.tableOrderFlow || 'modal') === 'modal' && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                  </div>
+                        ? 'bg-blue-50/40 hover:bg-blue-50/60'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-3.5 px-4 text-center">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition mx-auto ${
+                        (profileForm.tableOrderFlow || 'modal') === 'modal'
+                          ? 'border-[#004b9b] bg-[#004b9b] text-white shadow-xs'
+                          : 'border-slate-300 bg-white'
+                      }`}>
+                        {(profileForm.tableOrderFlow || 'modal') === 'modal' && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-100 text-[#004b9b] border border-blue-200 inline-flex items-center gap-1">
+                        Option 1 (Modal First)
+                      </span>
+                      <div className="font-mono text-[10px] text-slate-400 mt-1 font-bold">FLOW-MODAL</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-extrabold text-sm text-slate-900">
+                        1. Waiter & Customer Modal Dialog (Popup First)
+                      </div>
+                      <p className="text-slate-600 text-xs mt-0.5 leading-relaxed">
+                        Clicking a table opens a modal dialog to select Waiter and Customer/Channel first before navigating to the menu order screen.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedPreview(prev => prev === 'modal' ? null : 'modal');
+                        }}
+                        className="text-[11px] font-bold text-[#004b9b] hover:underline inline-flex items-center gap-1 mt-1.5 cursor-pointer"
+                      >
+                        <span>{expandedPreview === 'modal' ? '▲ Hide Visual Mockup' : '▼ View Visual Mockup'}</span>
+                      </button>
+                      {expandedPreview === 'modal' && (
+                        <div className="mt-2 p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-95 shadow-inner max-w-md animate-in fade-in">
+                          <div className="flex items-center justify-between text-[11px] text-blue-300 pb-1 border-b border-slate-800">
+                            <span className="font-bold">Table 05 (Floor 2)</span>
+                            <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-200 border border-blue-800">Popup Modal</span>
+                          </div>
+                          <div className="text-[10px] text-slate-300 flex items-center gap-1">
+                            <span>👤 Select Waiter:</span>
+                            <span className="text-amber-300">[-- Choose Waiter --]</span>
+                          </div>
+                          <div className="text-[10px] text-slate-300 flex items-center gap-1">
+                            <span>👥 Customer / Agent:</span>
+                            <span className="text-slate-400">[-- Choose Customer --]</span>
+                          </div>
+                          <div className="pt-1 flex justify-end">
+                            <span className="px-2 py-0.5 rounded bg-[#004b9b] text-white text-[10px] font-bold">Take Order →</span>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-blue-50 text-blue-800 border border-blue-200 inline-block">
+                        Standard Dine-In Service
+                      </span>
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-medium">Formal table service</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 flex-wrap">
+                          <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 border border-slate-200">Table Click</span>
+                          <span className="text-slate-400">➔</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-[#004b9b] rounded border border-blue-200 font-bold">Popup Modal</span>
+                          <span className="text-slate-400">➔</span>
+                          <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 border border-slate-200">Menu & Cart</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          Staff prompted to tag Waiter & Guest before food ordering
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      {(profileForm.tableOrderFlow || 'modal') === 'modal' ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Active Mode
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 inline-flex items-center">
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      {(profileForm.tableOrderFlow || 'modal') === 'modal' ? (
+                        <button
+                          type="button"
+                          className="px-3.5 py-1.5 bg-emerald-600 text-white font-bold text-xs rounded-lg shadow-xs inline-flex items-center justify-center gap-1.5 cursor-default w-full max-w-[120px]"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Selected
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveFlow('modal');
+                          }}
+                          className="px-3.5 py-1.5 bg-[#004b9b] hover:bg-[#003875] text-white font-bold text-xs rounded-lg shadow-xs transition inline-flex items-center justify-center gap-1.5 cursor-pointer w-full max-w-[120px]"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Select Mode
+                        </button>
+                      )}
+                    </td>
+                  </tr>
 
-                  <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
-                    <span>1. Waiter & Customer Modal Dialog (Popup First)</span>
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                    Clicking a table opens a modal dialog to select Waiter and Customer/Channel first before navigating to the menu order screen.
-                  </p>
-
-                  {/* Visual Preview Box */}
-                  <div className="p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-90 shadow-inner">
-                    <div className="flex items-center justify-between text-[11px] text-blue-300 pb-1 border-b border-slate-800">
-                      <span className="font-bold">Table 05 (Floor 2)</span>
-                      <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-200 border border-blue-800">Popup Modal</span>
-                    </div>
-                    <div className="text-[10px] text-slate-300 flex items-center gap-1">
-                      <span>👤 Select Waiter:</span>
-                      <span className="text-amber-300">[-- Choose Waiter --]</span>
-                    </div>
-                    <div className="text-[10px] text-slate-300 flex items-center gap-1">
-                      <span>👥 Customer / Agent:</span>
-                      <span className="text-slate-400">[-- Choose Customer --]</span>
-                    </div>
-                    <div className="pt-1 flex justify-end">
-                      <span className="px-2 py-0.5 rounded bg-[#004b9b] text-white text-[10px] font-bold">Take Order →</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-[#004b9b]">
-                  <span>Standard Dine-in Service</span>
-                  {(profileForm.tableOrderFlow || 'modal') === 'modal' ? (
-                    <span className="text-emerald-600 flex items-center gap-1 font-black">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Active Mode
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 group-hover:text-slate-700">Click to Select</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Option 2: Direct POS Order Screen */}
-              <div
-                onClick={() => handleSaveFlow('direct')}
-                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden group ${
-                  profileForm.tableOrderFlow === 'direct'
-                    ? 'border-emerald-600 bg-emerald-50/40 shadow-md ring-2 ring-emerald-400/20'
-                    : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                      <span>Option 2 (Direct POS)</span>
-                    </span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  {/* Option 2 Row */}
+                  <tr
+                    onClick={() => handleSaveFlow('direct')}
+                    className={`transition cursor-pointer select-none ${
                       profileForm.tableOrderFlow === 'direct'
-                        ? 'border-emerald-600 bg-emerald-600 text-white'
-                        : 'border-slate-300 bg-white'
-                    }`}>
-                      {profileForm.tableOrderFlow === 'direct' && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                  </div>
-
-                  <h4 className="text-base font-black text-slate-900 mb-1 flex items-center gap-2">
-                    <span>2. Direct 1-Click POS Order Screen (Instant Open)</span>
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                    Clicking a table opens the POS order taking screen directly with menu and cart. Waiter can be assigned at any time via the "Assign Waiter" button inside.
-                  </p>
-
-                  {/* Visual Preview Box */}
-                  <div className="p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-90 shadow-inner">
-                    <div className="flex items-center justify-between text-[11px] text-emerald-300 pb-1 border-b border-slate-800">
-                      <span className="font-bold">POS Terminal Screen</span>
-                      <span className="text-[10px] bg-emerald-950 px-1.5 py-0.5 rounded text-emerald-200 border border-emerald-800">1-Click Direct</span>
-                    </div>
-                    <div className="text-[10px] text-slate-300 flex justify-between">
-                      <span>[Menu: Food / Drinks / Steaks]</span>
-                      <span className="text-amber-300">[Table Cart]</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400">⚡ Instant item addition without pop-up</div>
-                    <div className="pt-1 flex justify-between items-center">
-                      <span className="text-[9px] text-slate-400">Optional: "Assign Waiter" inside</span>
-                      <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">Live POS</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-emerald-700">
-                  <span>Fast Counter & Express Mode</span>
-                  {profileForm.tableOrderFlow === 'direct' ? (
-                    <span className="text-emerald-600 flex items-center gap-1 font-black">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> Active Mode
-                    </span>
-                  ) : (
-                    <span className="text-slate-400 group-hover:text-slate-700">Click to Select</span>
-                  )}
-                </div>
-              </div>
+                        ? 'bg-emerald-50/40 hover:bg-emerald-50/60'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-3.5 px-4 text-center">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition mx-auto ${
+                        profileForm.tableOrderFlow === 'direct'
+                          ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                          : 'border-slate-300 bg-white'
+                      }`}>
+                        {profileForm.tableOrderFlow === 'direct' && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                        Option 2 (Direct POS)
+                      </span>
+                      <div className="font-mono text-[10px] text-slate-400 mt-1 font-bold">FLOW-DIRECT</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="font-extrabold text-sm text-slate-900">
+                        2. Direct 1-Click POS Order Screen (Instant Open)
+                      </div>
+                      <p className="text-slate-600 text-xs mt-0.5 leading-relaxed">
+                        Clicking a table opens the POS order taking screen directly with menu and cart. Waiter can be assigned at any time via the "Assign Waiter" button inside.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedPreview(prev => prev === 'direct' ? null : 'direct');
+                        }}
+                        className="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center gap-1 mt-1.5 cursor-pointer"
+                      >
+                        <span>{expandedPreview === 'direct' ? '▲ Hide Visual Mockup' : '▼ View Visual Mockup'}</span>
+                      </button>
+                      {expandedPreview === 'direct' && (
+                        <div className="mt-2 p-3 bg-slate-900 rounded-xl text-white text-xs border border-slate-700 font-mono space-y-1.5 opacity-95 shadow-inner max-w-md animate-in fade-in">
+                          <div className="flex items-center justify-between text-[11px] text-emerald-300 pb-1 border-b border-slate-800">
+                            <span className="font-bold">POS Terminal Screen</span>
+                            <span className="text-[10px] bg-emerald-950 px-1.5 py-0.5 rounded text-emerald-200 border border-emerald-800">1-Click Direct</span>
+                          </div>
+                          <div className="text-[10px] text-slate-300 flex justify-between">
+                            <span>[Menu: Food / Drinks / Steaks]</span>
+                            <span className="text-amber-300">[Table Cart]</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400">⚡ Instant item addition without pop-up</div>
+                          <div className="pt-1 flex justify-between items-center">
+                            <span className="text-[9px] text-slate-400">Optional: "Assign Waiter" inside</span>
+                            <span className="px-2 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-bold">Live POS</span>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200 inline-block">
+                        Fast Counter & Express Mode
+                      </span>
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-medium">Express & speed POS</div>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 flex-wrap">
+                          <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 border border-slate-200">Table Click</span>
+                          <span className="text-slate-400">➔</span>
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 rounded border border-emerald-200 font-bold">Direct POS Screen</span>
+                          <span className="text-slate-400">➔</span>
+                          <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600 border border-slate-200">Assign Waiter (Optional)</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium">
+                          ⚡ 1-Click instant item addition without modal interruption
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      {profileForm.tableOrderFlow === 'direct' ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1 shadow-2xs">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Active Mode
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 inline-flex items-center">
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      {profileForm.tableOrderFlow === 'direct' ? (
+                        <button
+                          type="button"
+                          className="px-3.5 py-1.5 bg-emerald-600 text-white font-bold text-xs rounded-lg shadow-xs inline-flex items-center justify-center gap-1.5 cursor-default w-full max-w-[120px]"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Selected
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveFlow('direct');
+                          }}
+                          className="px-3.5 py-1.5 bg-[#004b9b] hover:bg-[#003875] text-white font-bold text-xs rounded-lg shadow-xs transition inline-flex items-center justify-center gap-1.5 cursor-pointer w-full max-w-[120px]"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Select Mode
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
-                💡 Tip: Click either card to toggle your preferred workflow. Changes sync immediately to MongoDB and across all active POS terminals.
+                💡 Tip: Click either row to toggle your preferred workflow. Changes sync immediately to MongoDB and across all active POS terminals.
               </p>
               <button
                 type="button"
