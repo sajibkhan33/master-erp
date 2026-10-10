@@ -58,7 +58,8 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
     const arAcc = getAccountByRole('ACCOUNTS_RECEIVABLE') || getAccountByCode('1050') || coaList.find(a => a.type === 'ASSET');
     const invAcc = getAccountByRole('INVENTORY_ASSET') || getAccountByCode('1060') || coaList.find(a => a.type === 'ASSET');
     const apAcc = getAccountByRole('ACCOUNTS_PAYABLE') || getAccountByCode('2010') || coaList.find(a => a.type === 'LIABILITY');
-    const advanceAcc = getAccountByRole('CUSTOMER_ADVANCE') || getAccountByCode('2020') || getAccountByCode('2030') || coaList.find(a => a.type === 'LIABILITY');
+    const advanceAcc = getAccountByRole('CUSTOMER_ADVANCE') || getAccountByCode('2030') || getAccountByCode('2020') || coaList.find(a => a.type === 'LIABILITY');
+    const taxAcc = getAccountByRole('TAX_PAYABLE') || getAccountByCode('2020') || getAccountByCode('2030');
     const dineInRevAcc = getAccountByRole('DINE_IN_REVENUE') || getAccountByCode('4010') || coaList.find(a => a.type === 'REVENUE');
     const deliveryRevAcc = getAccountByRole('DELIVERY_REVENUE') || getAccountByCode('4020') || dineInRevAcc;
 
@@ -92,6 +93,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       if (norm === 'BKASH' || norm === 'NAGAD' || norm === 'MFS' || norm === 'ROCKET' || norm === 'UPAY') return mfsAcc?.code || '1040';
       if (norm === 'BANK' || norm === 'CARD' || norm === 'CHEQUE' || norm === 'POS') return bankAcc?.code || '1030';
       if (norm === 'CREDIT' || norm === 'DUE') return arAcc?.code || '1050';
+      if (norm === 'ADVANCE' || norm.includes('ADVANCE')) return advanceAcc?.code || '2030';
 
       const directAcc = coaList.find(a => a.code === methodIdOrName || a.id === methodIdOrName);
       if (directAcc) return directAcc.code;
@@ -128,8 +130,17 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
         revCode = deliveryRevAcc.code;
       }
 
-      // Cr Revenue Gross
-      postEntry(revCode, 0, gross, isPrior);
+      // VAT calculation for the sale
+      const vatVal = (typeof s.vatVal === 'number' && s.vatVal >= 0) ? s.vatVal : 0;
+      const netRev = Math.max(0, gross - disc - vatVal);
+
+      // Cr Revenue (Net Sales Revenue)
+      postEntry(revCode, 0, netRev, isPrior);
+
+      // Cr VAT & Tax Payable (Statutory Liabilities)
+      if (vatVal > 0) {
+        postEntry(taxAcc?.code || '2020', 0, vatVal, isPrior);
+      }
 
       // Dr Sales Discount (contra-revenue)
       if (disc > 0) {
@@ -143,10 +154,36 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       }
 
       // Dr Digital / Card / MFS Collections
-      if (s.paymentBreakdown) {
-        Object.entries(s.paymentBreakdown).forEach(([mId, amt]) => {
-          if (amt > 0 && mId.toLowerCase() !== 'cash') {
-            const code = getPaymentAccountCode(mId, bankAcc?.code || '1030');
+      if (s.paymentBreakdown && typeof s.paymentBreakdown === 'object') {
+        const handledMethodKeys = new Set<string>();
+        const methods = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : [];
+
+        Object.entries(s.paymentBreakdown).forEach(([mKey, rawAmt]) => {
+          const amt = Number(rawAmt) || 0;
+          if (amt <= 0 || mKey === 'byMethod') return;
+          const normKey = mKey.toLowerCase().trim();
+          if (
+            normKey === 'cash' || 
+            normKey === 'due' || 
+            normKey === 'advance' || 
+            normKey.includes('advance') || 
+            normKey === 'credit' || 
+            normKey.includes('due') || 
+            normKey.includes('credit')
+          ) return;
+
+          const matchedCfg = methods.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
+          if (matchedCfg) {
+            if (matchedCfg.type === 'CREDIT' || matchedCfg.type === 'CASH') return;
+            if (!handledMethodKeys.has(matchedCfg.id)) {
+              handledMethodKeys.add(matchedCfg.id);
+              handledMethodKeys.add(matchedCfg.name.toLowerCase());
+              const code = getPaymentAccountCode(matchedCfg.id, bankAcc?.code || '1030');
+              postEntry(code, amt, 0, isPrior);
+            }
+          } else if (!handledMethodKeys.has(normKey)) {
+            handledMethodKeys.add(normKey);
+            const code = getPaymentAccountCode(mKey, bankAcc?.code || '1030');
             postEntry(code, amt, 0, isPrior);
           }
         });
@@ -154,6 +191,12 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
         if ((s.card || 0) > 0) postEntry(getPaymentAccountCode('card_pos', bankAcc?.code || '1030'), s.card || 0, 0, isPrior);
         if ((s.bkash || 0) > 0) postEntry(getPaymentAccountCode('bkash_merchant', mfsAcc?.code || '1040'), s.bkash || 0, 0, isPrior);
         if ((s.nagad || 0) > 0) postEntry(getPaymentAccountCode('nagad_merchant', mfsAcc?.code || '1040'), s.nagad || 0, 0, isPrior);
+      }
+
+      // Dr Customer Advance Adjustment (deducting from Customer Advance Deposits liability)
+      const advAdjusted = s.advanceAdjusted || (s.paymentBreakdown?.advance ? Number(s.paymentBreakdown.advance) : 0);
+      if (advAdjusted > 0) {
+        postEntry(advanceAcc?.code || '2030', advAdjusted, 0, isPrior);
       }
 
       // Dr Accounts Receivable (Customer Due Incurred)
@@ -257,7 +300,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       postEntry(advFundCode, amt, 0, isPrior);
 
       // Cr Customer Advance Deposits
-      postEntry(advanceAcc?.code || '2020', 0, amt, isPrior);
+      postEntry(advanceAcc?.code || '2030', 0, amt, isPrior);
     });
 
     // 7. Process Recipe BOM Food Cost (COGS & Raw Material Inventory Consumption)
@@ -603,6 +646,25 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       totalOpEx += e.amount;
     });
 
+    // Journal adjustments to Operating Expenses
+    (data.journalEntries || []).forEach(j => {
+      if (!matchesDate(j.date)) return;
+      const coa = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+      const debitAcc = coa.find(a => a.id === j.debitAccountId || a.code === j.debitAccountId);
+      const creditAcc = coa.find(a => a.id === j.creditAccountId || a.code === j.creditAccountId);
+
+      if (debitAcc?.type === 'EXPENSE') {
+        const headName = debitAcc.name || 'Expense Adjustment';
+        expenseBreakdown[headName] = (expenseBreakdown[headName] || 0) + j.amount;
+        totalOpEx += j.amount;
+      }
+      if (creditAcc?.type === 'EXPENSE') {
+        const headName = creditAcc.name || 'Expense Adjustment';
+        expenseBreakdown[headName] = (expenseBreakdown[headName] || 0) - j.amount;
+        totalOpEx -= j.amount;
+      }
+    });
+
     const operatingProfitEbitda = grossProfit - totalOpEx;
     const operatingMargin = netRevenue > 0 ? ((operatingProfitEbitda / netRevenue) * 100).toFixed(1) : '0';
 
@@ -633,7 +695,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       netProfit,
       netProfitMargin
     };
-  }, [data.sales, data.inventory, data.expenses, data.masterItems, data.menuItems, startDate, endDate]);
+  }, [data.sales, data.inventory, data.expenses, data.masterItems, data.menuItems, data.journalEntries, data.chartOfAccounts, startDate, endDate]);
 
   // --- 16. BALANCE SHEET (AS PER IFRS - STATEMENT OF FINANCIAL POSITION) ---
   const ifrsBalanceSheetData = useMemo(() => {
@@ -705,6 +767,29 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       else bankBalance += adv.amount;
     });
 
+    // Journal Entries Effect on Cash, Bank, AR, AP
+    (data.journalEntries || []).forEach(j => {
+      const isDrCash = j.debitAccountId === '1010' || j.debitAccountName?.includes('1010');
+      const isCrCash = j.creditAccountId === '1010' || j.creditAccountName?.includes('1010');
+      if (isDrCash) cashBalance += j.amount;
+      if (isCrCash) cashBalance -= j.amount;
+
+      const isDrBank = j.debitAccountId === '1030' || j.debitAccountId === '1040' || j.debitAccountName?.includes('1030') || j.debitAccountName?.includes('1040');
+      const isCrBank = j.creditAccountId === '1030' || j.creditAccountId === '1040' || j.creditAccountName?.includes('1030') || j.creditAccountName?.includes('1040');
+      if (isDrBank) bankBalance += j.amount;
+      if (isCrBank) bankBalance -= j.amount;
+
+      const isDrAr = j.debitAccountId === '1050' || j.debitAccountName?.includes('1050');
+      const isCrAr = j.creditAccountId === '1050' || j.creditAccountName?.includes('1050');
+      if (isDrAr) arBalance += j.amount;
+      if (isCrAr) arBalance -= j.amount;
+
+      const isDrAp = j.debitAccountId === '2010' || j.debitAccountName?.includes('2010');
+      const isCrAp = j.creditAccountId === '2010' || j.creditAccountName?.includes('2010');
+      if (isDrAp) apBalance -= j.amount;
+      if (isCrAp) apBalance += j.amount;
+    });
+
     const totalCurrentAssets = Math.max(0, cashBalance) + Math.max(0, bankBalance) + Math.max(0, arBalance) + Math.round(closingInventoryVal);
     const nonCurrentAssets = 250000; // Kitchen plant, cold rooms, POS hardware
     const totalAssets = totalCurrentAssets + nonCurrentAssets;
@@ -720,7 +805,9 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
 
     let advanceLiabilities = 0;
     (data.customerAdvances || []).forEach(adv => {
-      if (adv.status === 'ACTIVE') advanceLiabilities += adv.amount;
+      if (adv.status === 'ACTIVE') {
+        advanceLiabilities += Math.max(0, (adv.amount || 0) - (adv.adjustedAmount || 0));
+      }
     });
 
     const totalCurrentLiabilities = apBalance + advanceLiabilities;
@@ -747,7 +834,7 @@ export const FinancialStatementsReports: React.FC<SubReportProps> = ({ reportTyp
       totalEquity,
       totalEquityAndLiabilities
     };
-  }, [data.masterItems, data.inventory, data.purchases, data.sales, data.payments, data.expenses, data.customerAdvances, ifrsPnlData.netProfit]);
+  }, [data.masterItems, data.inventory, data.purchases, data.sales, data.payments, data.expenses, data.customerAdvances, data.journalEntries, ifrsPnlData.netProfit]);
 
   // --- 17. CASH FLOW STATEMENT (AS PER IFRS - IAS 7) ---
   const ifrsCashFlowData = useMemo(() => {

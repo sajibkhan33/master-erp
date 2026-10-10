@@ -48,7 +48,7 @@ async function initDatabase() {
         await RestaurantStateModel.findOneAndUpdate(
           { stateKey: STATE_KEY },
           { stateKey: STATE_KEY, data: cachedState, timestamp: Date.now() },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
         isLoadedFromMongo = true;
         console.log("🌱 Seeded initial restaurant state into MongoDB from local backup.");
@@ -1782,7 +1782,7 @@ async function startServer() {
             await RestaurantStateModel.findOneAndUpdate(
               { stateKey: STATE_KEY },
               { stateKey: STATE_KEY, data: cachedState, timestamp: lastServerUpdate },
-              { upsert: true, new: true }
+              { upsert: true, returnDocument: 'after' }
             );
             isLoadedFromMongo = true;
           } catch (err: any) {
@@ -1941,8 +1941,12 @@ Return ONLY a valid JSON object matching this exact schema:
     }
   });
 
+  // Auto-detect production mode (bundled dist/server.cjs) vs development mode (server.ts)
+  const isProduction = process.env.NODE_ENV === "production" || 
+    (!process.argv.some(arg => arg.includes("server.ts")) && fs.existsSync(path.join(process.cwd(), "dist", "index.html")));
+
   // Vite middleware in dev or static files in prod
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

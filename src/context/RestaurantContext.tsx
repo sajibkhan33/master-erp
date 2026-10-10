@@ -368,6 +368,30 @@ export function ensureAccountSystemRoles(accounts: AccountHead[]): AccountHead[]
   }));
 }
 
+export function isSameCustomer(name1?: string, name2?: string): boolean {
+  if (!name1 || !name2) return false;
+  const n1 = name1.trim().toLowerCase();
+  const n2 = name2.trim().toLowerCase();
+  if (!n1 || !n2) return false;
+  if (n1.includes('walk-in') || n2.includes('walk-in')) {
+    return n1 === n2;
+  }
+  if (n1 === n2) return true;
+
+  const clean = (s: string) => s
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const c1 = clean(n1);
+  const c2 = clean(n2);
+  if (c1 && c2 && c1 === c2) return true;
+  if (c1.length >= 3 && c2.length >= 3 && (c1.includes(c2) || c2.includes(c1))) return true;
+
+  return false;
+}
+
 const DEFAULT_CUSTOMER_ADVANCES: CustomerAdvance[] = [
   {
     id: 180001,
@@ -1418,9 +1442,11 @@ interface RestaurantContextType {
       bkash?: number; 
       nagad?: number; 
       due?: number; 
+      advance?: number;
       byMethod?: Record<string, number>; 
     },
-    waiterOverride?: string
+    waiterOverride?: string,
+    customerOverride?: string
   ) => void;
   getMethodCollection: (method: PaymentMethodConfig | string) => number;
   getMethodLiveBalance: (method: PaymentMethodConfig | string) => number;
@@ -1529,6 +1555,7 @@ interface RestaurantContextType {
 
   // Accounting Journal Entries
   addJournalEntry: (entry: Omit<JournalEntry, 'id'>) => void;
+  editJournalEntry: (id: string, entry: Partial<JournalEntry>) => void;
   deleteJournalEntry: (id: string) => void;
 
   // Chart of Accounts (COA)
@@ -1541,6 +1568,7 @@ interface RestaurantContextType {
   // Customer Advance Deposits
   saveCustomerAdvance: (advance: Omit<CustomerAdvance, 'id'> & { id?: number }) => void;
   deleteCustomerAdvance: (id: number) => void;
+  getCustomerAvailableAdvance: (customerName: string) => number;
   
   // Cleanup & Backup Tools
   resetModuleData: (module: 'sales' | 'expenses' | 'purchases' | 'payables' | 'stock' | 'inventory' | 'tables' | 'menu' | 'masterItems' | 'items' | 'customerAdvances' | 'coa' | 'users' | 'all') => void;
@@ -2869,18 +2897,99 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const totalProductionCost = totalBomCostVal + totalManualUsedCostVal + totalWastageCostVal;
   const estimatedProfit = netSalesRevenue - (totalProductionCost + totalExpenses);
 
-  const payCash = activeSalesList.reduce((sum, s) => sum + (s.cash || 0), 0);
-  const payCard = activeSalesList.reduce((sum, s) => sum + (s.card || 0), 0);
-  const payBkash = activeSalesList.reduce((sum, s) => sum + (s.bkash || 0), 0);
-  const payNagad = activeSalesList.reduce((sum, s) => sum + (s.nagad || 0), 0);
+  const methodList = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
 
   // Helper to find configured payment method
   const getMethodConfig = (m?: string): PaymentMethodConfig | undefined => {
     if (!m) return undefined;
-    const list = data.paymentMethods && data.paymentMethods.length > 0 ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
+    const list = (data.paymentMethods && data.paymentMethods.length > 0) ? data.paymentMethods : DEFAULT_PAYMENT_METHODS;
     const norm = m.toLowerCase().trim();
     return list.find(pm => pm.id.toLowerCase() === norm || pm.name.toLowerCase() === norm || norm.includes(pm.id.toLowerCase()) || norm.includes(pm.name.toLowerCase()));
   };
+
+  const hasDedicatedMfsHead = coaList.some(a => (a.systemRole || getAccountSystemRole(a)) === 'MOBILE_BANKING' || a.code === '1040');
+
+  let payCash = 0;
+  let payCard = 0;
+  let payBkash = 0;
+  let payNagad = 0;
+
+  activeSalesList.forEach(s => {
+    if (s.paymentBreakdown && typeof s.paymentBreakdown === 'object') {
+      const handledMethodKeys = new Set<string>();
+      Object.entries(s.paymentBreakdown).forEach(([key, rawAmt]) => {
+        const amt = Number(rawAmt) || 0;
+        if (amt <= 0 || key === 'byMethod') return;
+        const normKey = key.toLowerCase().trim();
+
+        // Advance adjustment or customer dues are NOT liquid fund receipts at POS settlement
+        // Advance was already accounted for in cash/bank when initially deposited.
+        if (normKey === 'advance' || normKey.includes('advance') || normKey === 'due' || normKey.includes('due') || normKey === 'credit') {
+          return;
+        }
+
+        const matched = methodList.find(m => m.id.toLowerCase() === normKey || m.name.toLowerCase() === normKey);
+        if (matched) {
+          if (!handledMethodKeys.has(matched.id)) {
+            handledMethodKeys.add(matched.id);
+            handledMethodKeys.add(matched.name.toLowerCase());
+
+            let targetRole: AccountSystemRole | undefined = undefined;
+            if (matched.ledgerAccountId) {
+              const linkedAcc = coaList.find(a => a.code === matched.ledgerAccountId || a.id === matched.ledgerAccountId);
+              if (linkedAcc) {
+                targetRole = linkedAcc.systemRole || getAccountSystemRole(linkedAcc);
+              }
+            }
+
+            if (targetRole === 'BANK' || matched.type === 'BANK' || matched.type === 'CARD') {
+              payCard += amt;
+            } else if (targetRole === 'CASH' || matched.type === 'CASH') {
+              payCash += amt;
+            } else if (targetRole === 'MOBILE_BANKING' || matched.type === 'MFS') {
+              if (hasDedicatedMfsHead) {
+                const mNorm = `${matched.id} ${matched.name} ${matched.providerName || ''}`.toLowerCase();
+                if (mNorm.includes('nagad')) payNagad += amt;
+                else payBkash += amt;
+              } else {
+                // If no dedicated MFS account head in Chart of Accounts, settle into primary Bank Account
+                payCard += amt;
+              }
+            } else if (matched.type === 'CREDIT' || targetRole === 'ACCOUNTS_RECEIVABLE') {
+              // Customer receivable credit - not liquid cash/bank
+            } else {
+              payCard += amt;
+            }
+          }
+        } else if (!handledMethodKeys.has(normKey)) {
+          handledMethodKeys.add(normKey);
+          if (normKey === 'cash') payCash += amt;
+          else if (normKey === 'card') payCard += amt;
+          else if (normKey === 'nagad') {
+            if (hasDedicatedMfsHead) payNagad += amt;
+            else payCard += amt;
+          } else if (normKey === 'bkash') {
+            if (hasDedicatedMfsHead) payBkash += amt;
+            else payCard += amt;
+          } else if (normKey === 'due' || normKey === 'credit' || normKey === 'advance') {
+            // Customer credit receivable or advance adjustment
+          } else {
+            payCard += amt;
+          }
+        }
+      });
+    } else {
+      payCash += (s.cash || 0);
+      if (hasDedicatedMfsHead) {
+        payCard += (s.card || 0);
+        payBkash += (s.bkash || 0);
+        payNagad += (s.nagad || 0);
+      } else {
+        payCard += (s.card || 0) + (s.bkash || 0) + (s.nagad || 0);
+      }
+    }
+  });
 
   // Payment Account Live Balances (Cash Drawer, Bank Transfer, Cheque, bKash Merchant, Nagad Merchant, Petty Cash)
   const isExpenseCash = (m?: string) => {
@@ -2901,9 +3010,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const isExpenseBank = (m?: string) => {
     if (!m) return false;
     const norm = m.toLowerCase().trim();
-    if (norm.includes('bank') || norm.includes('card')) return true;
+    if (norm.includes('bank') || norm.includes('card') || norm.includes('qr')) return true;
     const cfg = getMethodConfig(m);
-    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD' || cfg?.type === 'BANGLA_QR';
   };
   const isExpenseBkash = (m?: string) => {
     if (!m) return false;
@@ -2936,7 +3045,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const cfg = getMethodConfig(method);
     if (cfg) {
       if (cfg.type === 'CASH') return 'CASH';
-      if (cfg.type === 'BANK' || cfg.type === 'CARD') return 'BANK';
+      if (cfg.type === 'BANK' || cfg.type === 'CARD' || cfg.type === 'BANGLA_QR') return 'BANK';
       if (cfg.type === 'MFS') {
         if (cfg.name.toLowerCase().includes('nagad')) return 'NAGAD';
         return 'BKASH';
@@ -2944,7 +3053,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     const m = method.toUpperCase();
     if (m === 'CASH') return 'CASH';
-    if (m === 'BANK' || m === 'CARD') return 'BANK';
+    if (m === 'BANK' || m === 'CARD' || m.includes('QR')) return 'BANK';
     if (m === 'NAGAD') return 'NAGAD';
     if (m === 'BKASH') return 'BKASH';
     return 'CASH';
@@ -2973,7 +3082,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const norm = (m || '').toLowerCase().trim();
     if (norm === 'bank transfer' || norm === 'bank') return true;
     const cfg = getMethodConfig(m);
-    return cfg?.type === 'BANK' || cfg?.type === 'CARD';
+    return cfg?.type === 'BANK' || cfg?.type === 'CARD' || cfg?.type === 'BANGLA_QR';
   };
   const isChequeMethod = (m: string) => {
     const norm = (m || '').toLowerCase().trim();
@@ -2998,7 +3107,6 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const vendorPayBkash = data.payments.filter(p => isBkashMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
   const vendorPayNagad = data.payments.filter(p => isNagadMethod(p.method)).reduce((sum, p) => sum + (p.amount || 0), 0);
 
-  const coaList = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
   const getOpeningBalance = (roleOrCode: string, fallbackKeywords: string[] = []): number => {
     // 1. Dynamic ERP System Role mapping
     const matchByRole = coaList.find(a => (a.systemRole || getAccountSystemRole(a)) === roleOrCode);
@@ -4554,9 +4662,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       bkash?: number; 
       nagad?: number; 
       due?: number;
+      advance?: number;
       byMethod?: Record<string, number>;
     },
-    waiterOverride?: string
+    waiterOverride?: string,
+    customerOverride?: string
   ) => {
     if (!data.session || !data.session.isActive) {
       setIsStartSessionModalOpen(true);
@@ -4566,6 +4676,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!table || table.cart.length === 0) return;
 
     const assignedWaiter = (waiterOverride || table.waiter || '').trim();
+    const assignedCustomer = (customerOverride || table.customer || 'Walk-in Customer').trim();
 
     const agents = data.commissionAgents || DEFAULT_COMMISSION_AGENTS;
     const agent = agents.find(a => a.id === table.channelOrAgentId);
@@ -4608,11 +4719,17 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     let computedBkash = 0;
     let computedNagad = 0;
     let computedDue = 0;
+    let computedAdvance = Number(payments.advance) || 0;
 
     if (payments.byMethod && Object.keys(payments.byMethod).length > 0) {
       Object.entries(payments.byMethod).forEach(([mId, amt]) => {
         const val = Number(amt) || 0;
         if (val <= 0) return;
+        if (mId === 'advance') {
+          computedAdvance = val;
+          paymentBreakdown['advance'] = val;
+          return;
+        }
         paymentBreakdown[mId] = val;
         const targetMethod = methodList.find(m => m.id === mId || m.name.toLowerCase() === mId.toLowerCase());
         if (targetMethod) {
@@ -4647,6 +4764,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       computedBkash = Number(payments.bkash) || 0;
       computedNagad = Number(payments.nagad) || 0;
       computedDue = Number(payments.due) || 0;
+      computedAdvance = Number(payments.advance) || computedAdvance;
       paymentBreakdown['cash'] = computedCash;
       paymentBreakdown['card'] = computedCard;
       paymentBreakdown['bkash'] = computedBkash;
@@ -4654,7 +4772,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       paymentBreakdown['due'] = computedDue;
     }
 
-    const totalEntered = computedCash + computedCard + computedBkash + computedNagad + computedDue;
+    if (computedAdvance > 0) {
+      paymentBreakdown['advance'] = computedAdvance;
+    }
+
+    const totalEntered = computedCash + computedCard + computedBkash + computedNagad + computedDue + computedAdvance;
     if (totalEntered < netTotal) {
       alert(`Payment is incomplete! Remaining balance: ৳ ${(netTotal - totalEntered).toLocaleString()}`);
       return;
@@ -4695,8 +4817,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       bkash: computedBkash,
       nagad: computedNagad,
       dueGiven: computedDue,
-      dueCustomer: computedDue > 0 ? table.customer : '',
+      dueCustomer: computedDue > 0 ? assignedCustomer : '',
       dueCollected: 0,
+      advanceAdjusted: computedAdvance,
       paymentBreakdown,
       change: changeReturn,
       total: netTotal,
@@ -4719,26 +4842,60 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     // Update state
-    setData(prev => ({
-      ...prev,
-      sales: [...prev.sales, newSale],
-      tables: prev.tables.map(t => t.id === tableId ? {
-        ...t,
-        status: 'free',
-        waiter: '',
-        customer: 'Walk-in Customer',
-        channelOrAgentId: 'dine_in',
-        discountType: 'taka',
-        discountVal: 0,
-        cart: [],
-        orderCreatedBy: undefined,
-        orderCreatedRole: undefined,
-        orderCreatedId: undefined,
-        orderCreatedAt: undefined,
-        billedAt: undefined,
-        billedAtTime: undefined
-      } : t)
-    }));
+    setData(prev => {
+      let unadjustedAdvanceToDeduct = computedAdvance;
+      const targetCustomer = (assignedCustomer || '').trim();
+
+      const updatedCustomerAdvances = (unadjustedAdvanceToDeduct > 0 && targetCustomer && !targetCustomer.toLowerCase().includes('walk-in'))
+        ? (prev.customerAdvances || []).map(adv => {
+            if (unadjustedAdvanceToDeduct <= 0) return adv;
+            if (!isSameCustomer(adv.customer, targetCustomer) || adv.status === 'REFUNDED') return adv;
+
+            const remainingOnThis = Math.max(0, (adv.amount || 0) - (adv.adjustedAmount || 0));
+            if (remainingOnThis <= 0) return adv;
+
+            const toDeduct = Math.min(unadjustedAdvanceToDeduct, remainingOnThis);
+            const newAdjusted = (adv.adjustedAmount || 0) + toDeduct;
+            unadjustedAdvanceToDeduct -= toDeduct;
+
+            return {
+              ...adv,
+              adjustedAmount: newAdjusted,
+              status: newAdjusted >= adv.amount ? ('ADJUSTED' as const) : ('ACTIVE' as const),
+              linkedInvoiceNo: invoiceNo
+            };
+          })
+        : (prev.customerAdvances || []);
+
+      const currentCusts = prev.customers || [];
+      const hasCust = currentCusts.some(c => isSameCustomer(c, targetCustomer));
+      const updatedCustomers = (hasCust || !targetCustomer || targetCustomer.toLowerCase().includes('walk-in'))
+        ? currentCusts
+        : [...currentCusts, targetCustomer];
+
+      return {
+        ...prev,
+        customers: updatedCustomers,
+        customerAdvances: updatedCustomerAdvances,
+        sales: [...prev.sales, newSale],
+        tables: prev.tables.map(t => t.id === tableId ? {
+          ...t,
+          status: 'free',
+          waiter: '',
+          customer: 'Walk-in Customer',
+          channelOrAgentId: 'dine_in',
+          discountType: 'taka',
+          discountVal: 0,
+          cart: [],
+          orderCreatedBy: undefined,
+          orderCreatedRole: undefined,
+          orderCreatedId: undefined,
+          orderCreatedAt: undefined,
+          billedAt: undefined,
+          billedAtTime: undefined
+        } : t)
+      };
+    });
 
     // Trigger celebration confetti
     try {
@@ -4764,7 +4921,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       waiter: assignedWaiter || 'N/A',
       orderTakenBy: getOrderTakerDisplay(sellerName, sellerRole),
       settleBillRole: formatRoleTitle(currentUser?.role || 'CASHIER'),
-      customer: table.customer || 'Walk-in Customer',
+      customer: assignedCustomer || 'Walk-in Customer',
       items: table.cart,
       subtotal,
       discountDeduction: discDeduction,
@@ -4780,6 +4937,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         bkash: computedBkash,
         nagad: computedNagad,
         due: computedDue,
+        advance: computedAdvance,
         byMethod: paymentBreakdown
       },
       changeReturn,
@@ -6705,6 +6863,16 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }));
   };
 
+  const editJournalEntry = (id: string, updated: Partial<JournalEntry>) => {
+    lastLocalEditTimeRef.current = Date.now();
+    setData(prev => ({
+      ...prev,
+      journalEntries: (prev.journalEntries || DEFAULT_JOURNAL_ENTRIES).map(j =>
+        j.id === id ? { ...j, ...updated } : j
+      )
+    }));
+  };
+
   const deleteJournalEntry = (id: string) => {
     setData(prev => ({
       ...prev,
@@ -6776,10 +6944,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (prev.journalEntries) {
           updatedJournalEntries = prev.journalEntries.map(j => ({
             ...j,
-            debitAccountId: j.debitAccountId === oldCode ? newCode : j.debitAccountId,
-            creditAccountId: j.creditAccountId === oldCode ? newCode : j.creditAccountId,
-            debitAccountName: (j.debitAccountId === oldCode || j.debitAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.debitAccountName,
-            creditAccountName: (j.creditAccountId === oldCode || j.creditAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.creditAccountName
+            debitAccountId: (j.debitAccountId === oldCode || j.debitAccountId === id) ? newCode : j.debitAccountId,
+            creditAccountId: (j.creditAccountId === oldCode || j.creditAccountId === id) ? newCode : j.creditAccountId,
+            debitAccountName: (j.debitAccountId === oldCode || j.debitAccountId === id || j.debitAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.debitAccountName,
+            creditAccountName: (j.creditAccountId === oldCode || j.creditAccountId === id || j.creditAccountId === newCode) && updated.name ? `${newCode} - ${updated.name}` : j.creditAccountName
           }));
         }
       }
@@ -6932,6 +7100,14 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }).reduce((sum, e) => sum + (e.amount || 0), 0);
           return opening + headExpenses + journalEffect;
         }
+        if (acc.type === 'ASSET') {
+          const chartAccounts = data.chartOfAccounts || DEFAULT_CHART_OF_ACCOUNTS;
+          const assetExpenses = (data.expenses || []).filter(e => {
+            const matched = resolveExpenseAccount(e, chartAccounts);
+            return matched && (matched.id === acc.id || matched.code === acc.code);
+          }).reduce((sum, e) => sum + (e.amount || 0), 0);
+          return opening + assetExpenses + journalEffect;
+        }
         return opening + journalEffect;
     }
   };
@@ -7019,7 +7195,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (methodObj.type === 'CARD') {
         return payCard || 0;
       }
-      if (methodObj.type === 'BANK') {
+      if (methodObj.type === 'BANK' || methodObj.type === 'BANGLA_QR') {
         return bankTransferBalance || 0;
       }
       if (methodObj.type === 'CREDIT') {
@@ -7045,23 +7221,34 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     lastLocalEditTimeRef.current = Date.now();
     setData(prev => {
       const list = prev.customerAdvances || [];
+      const custName = (advance.customer || '').trim();
+      
+      const currentCusts = prev.customers || [];
+      const hasCustomer = currentCusts.some(c => isSameCustomer(c, custName));
+      const updatedCustomers = (hasCustomer || !custName || custName.toLowerCase().includes('walk-in'))
+        ? currentCusts
+        : [...currentCusts, custName];
+
       if (advance.id) {
         return {
           ...prev,
+          customers: updatedCustomers,
           customerAdvances: list.map(a => a.id === advance.id ? { ...a, ...advance } as CustomerAdvance : a)
         };
       } else {
         const newAdv: CustomerAdvance = {
           id: Date.now(),
           date: advance.date || new Date().toISOString().split('T')[0],
-          customer: advance.customer,
+          customer: custName,
           amount: Number(advance.amount) || 0,
+          adjustedAmount: 0,
           method: advance.method || 'CASH',
           note: advance.note || '',
           status: advance.status || 'ACTIVE'
         };
         return {
           ...prev,
+          customers: updatedCustomers,
           customerAdvances: [newAdv, ...list]
         };
       }
@@ -7073,6 +7260,15 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...prev,
       customerAdvances: (prev.customerAdvances || []).filter(a => a.id !== id)
     }));
+  };
+
+  const getCustomerAvailableAdvance = (customerName: string): number => {
+    if (!customerName || !data.customerAdvances) return 0;
+    const norm = customerName.trim().toLowerCase();
+    if (!norm || norm === 'walk-in customer' || norm === 'walk-in') return 0;
+    return (data.customerAdvances || [])
+      .filter(a => isSameCustomer(a.customer, customerName) && a.status !== 'REFUNDED')
+      .reduce((sum, a) => sum + Math.max(0, (a.amount || 0) - (a.adjustedAmount || 0)), 0);
   };
 
   // Settle specific Purchase Bill / Voucher or Pay All Dues
@@ -7313,8 +7509,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const totalCustomerAdvances = (data.customerAdvances || [])
-    .filter(a => a.status === 'ACTIVE')
-    .reduce((sum, a) => sum + (a.amount || 0), 0);
+    .filter(a => a.status === 'ACTIVE' || (a.status !== 'REFUNDED' && (a.amount || 0) > (a.adjustedAmount || 0)))
+    .reduce((sum, a) => sum + Math.max(0, (a.amount || 0) - (a.adjustedAmount || 0)), 0);
 
   return (
     <RestaurantContext.Provider value={{
@@ -7483,6 +7679,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       editLeaveType,
       deleteLeaveType,
       addJournalEntry,
+      editJournalEntry,
       deleteJournalEntry,
       addConfigItem,
       editConfigItem,
@@ -7504,6 +7701,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       findExpenseAccount,
       saveCustomerAdvance,
       deleteCustomerAdvance,
+      getCustomerAvailableAdvance,
       resetModuleData,
       cleanModuleData,
       resetAllData,
@@ -7541,12 +7739,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         payBkash,
         payNagad,
         paymentAccountBalances: {
-          cashDrawer: cashDrawerBalance,
-          pettyCash: pettyCashBalance,
-          bankTransfer: bankTransferBalance,
+          cashDrawer: getMethodLiveBalance('cash') || cashDrawerBalance,
+          pettyCash: getMethodLiveBalance('petty_cash') || pettyCashBalance,
+          bankTransfer: getMethodLiveBalance('bank_transfer') || bankTransferBalance,
           cheque: chequeBalance,
-          bkashMerchant: bkashMerchantBalance,
-          nagadMerchant: nagadMerchantBalance
+          bkashMerchant: getMethodLiveBalance('bkash_merchant') || bkashMerchantBalance,
+          nagadMerchant: getMethodLiveBalance('nagad_merchant') || nagadMerchantBalance
         },
         freeTablesCount,
         occupiedTablesCount,

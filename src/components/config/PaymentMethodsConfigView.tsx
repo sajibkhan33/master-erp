@@ -7,7 +7,6 @@ import {
   Edit3,
   Trash2,
   CheckCircle2,
-  Check,
   X,
   Smartphone,
   Banknote,
@@ -18,7 +17,8 @@ import {
   AlertTriangle,
   Star,
   Sliders,
-  DollarSign
+  DollarSign,
+  QrCode
 } from 'lucide-react';
 
 export interface PaymentTypeOption {
@@ -96,6 +96,18 @@ export const PAYMENT_TYPE_OPTIONS: PaymentTypeOption[] = [
     activeBorderClass: 'border-amber-500 ring-2 ring-amber-400 bg-amber-50/70 text-amber-950'
   },
   {
+    type: 'BANGLA_QR',
+    label: 'Bangla QR (Universal QR)',
+    bnLabel: 'বাংলা কিউআর (সর্বজনীন কিউআর)',
+    subTitle: 'bKash, Nagad, Rocket, Cards & All Bank Apps',
+    bnSubTitle: 'বিকাশ, নগদ, রকেট, কার্ড ও সকল ব্যাংক অ্যাপ কিউআর',
+    defaultProvider: 'Bangla QR',
+    defaultLedgerCode: '1030',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
+    borderClass: 'border-slate-200 hover:border-purple-300',
+    activeBorderClass: 'border-purple-500 ring-2 ring-purple-400 bg-purple-50/70 text-purple-950'
+  },
+  {
     type: 'OTHER',
     label: 'Other Digital Gateway',
     bnLabel: 'অন্যান্য গেটওয়ে',
@@ -149,6 +161,7 @@ export const PaymentMethodsConfigView: React.FC = () => {
   const typeCounts: Record<string, number> = {
     ALL: paymentMethods.length,
     CASH: paymentMethods.filter(m => m.type === 'CASH').length,
+    BANGLA_QR: paymentMethods.filter(m => m.type === 'BANGLA_QR').length,
     MFS: paymentMethods.filter(m => m.type === 'MFS').length,
     CARD: paymentMethods.filter(m => m.type === 'CARD').length,
     BANK: paymentMethods.filter(m => m.type === 'BANK').length,
@@ -269,6 +282,8 @@ export const PaymentMethodsConfigView: React.FC = () => {
     switch (type) {
       case 'CASH':
         return <Banknote className={`${iconClass} text-emerald-600`} />;
+      case 'BANGLA_QR':
+        return <QrCode className={`${iconClass} text-purple-600`} />;
       case 'MFS':
         return <Smartphone className={`${iconClass} text-pink-600`} />;
       case 'CARD':
@@ -288,6 +303,8 @@ export const PaymentMethodsConfigView: React.FC = () => {
     switch (type) {
       case 'CASH':
         return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Cash</span>;
+      case 'BANGLA_QR':
+        return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>Bangla QR</span>;
       case 'MFS':
         return <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${badgeClass}`}>MFS / Mobile</span>;
       case 'CARD':
@@ -679,14 +696,17 @@ export const PaymentMethodsConfigView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => updatePaymentMethod(m.id, { isActive: !m.isActive })}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold transition cursor-pointer border ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold transition-all cursor-pointer border shadow-2xs ${
                             m.isActive
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                              : 'bg-slate-200 text-slate-600 border-slate-300 hover:bg-slate-300'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                              : 'bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200 hover:border-slate-400'
                           }`}
-                          title="Click to toggle active status"
+                          title={m.isActive ? (language === 'bn' ? 'ক্লিক করে মেথডটি বন্ধ (Inactive) করুন' : 'Click to deactivate (Hide from POS)') : (language === 'bn' ? 'ক্লিক করে মেথডটি চালু (Active) করুন' : 'Click to activate (Show in POS)')}
                         >
-                          {m.isActive ? '✓ Active' : '✕ Disabled'}
+                          <span className={`w-2 h-2 rounded-full transition-transform ${
+                            m.isActive ? 'bg-emerald-500 ring-2 ring-emerald-300' : 'bg-slate-400'
+                          }`} />
+                          <span>{m.isActive ? (language === 'bn' ? 'সক্রিয় (Active)' : 'Active') : (language === 'bn' ? 'নিষ্ক্রিয় (Inactive)' : 'Inactive')}</span>
                         </button>
                       </td>
 
@@ -788,56 +808,32 @@ export const PaymentMethodsConfigView: React.FC = () => {
                 />
               </div>
 
-              {/* Payment Type Selection (Visual Cards Marking) */}
+              {/* Payment Type Selection (Standard Dropdown Select) */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-black text-slate-800">
-                    {language === 'bn' ? 'পেমেন্ট টাইপ মার্ক করুন (Mark Payment Type) *' : 'Mark Payment Type *'}
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    {language === 'bn' ? 'পেমেন্ট টাইপ (Payment Type) *' : 'Payment Type *'}
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">
+                  <span className="text-[10px] font-semibold text-slate-400">
                     {language === 'bn' ? 'টাইপ ভিত্তিক ফিল্টারিং ও লেজার সংযোগ' : 'Type-based POS filtering & ledger mapping'}
                   </span>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {PAYMENT_TYPE_OPTIONS.map(opt => {
-                    const isSelected = formType === opt.type;
-                    return (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        onClick={() => handleSelectType(opt.type)}
-                        className={`p-2.5 rounded-xl border text-left transition relative cursor-pointer flex flex-col justify-between ${
-                          isSelected
-                            ? opt.activeBorderClass
-                            : `${opt.borderClass} bg-slate-50/60 hover:bg-slate-100/70`
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <div className="p-1.5 rounded-lg bg-white border border-slate-200/80 shadow-2xs">
-                            {getTypeIcon(opt.type, 'w-3.5 h-3.5')}
-                          </div>
-                          {isSelected ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-[#004b9b] text-white">
-                              <Check className="w-2.5 h-2.5" />
-                              <span>Marked</span>
-                            </span>
-                          ) : (
-                            <span className="text-[9px] font-semibold text-slate-400">Select</span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-extrabold text-[11px] leading-tight">
-                            {language === 'bn' ? opt.bnLabel : opt.label}
-                          </div>
-                          <div className="text-[9px] text-slate-500 mt-0.5 line-clamp-1 leading-snug">
-                            {language === 'bn' ? opt.bnSubTitle : opt.subTitle}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <select
+                  value={formType}
+                  onChange={e => handleSelectType(e.target.value as PaymentMethodType)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#004b9b] font-medium text-slate-800 cursor-pointer"
+                >
+                  {PAYMENT_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.type} value={opt.type}>
+                      {language === 'bn' ? opt.bnLabel : opt.label} ({opt.subTitle})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {language === 'bn'
+                    ? 'টাইপ পরিবর্তন করলে ডিফল্ট প্রোভাইডার ও লেজার হেড স্বয়ংক্রিয়ভাবে আপডেট হবে'
+                    : 'Changing type auto-fills suggested provider and linked ledger head'}
+                </p>
               </div>
 
               {/* Provider Name */}
