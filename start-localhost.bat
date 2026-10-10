@@ -1,11 +1,11 @@
 @echo off
-title CAFE BANANI POS - Localhost (http://localhost:3000)
+title MASTER ERP POS - Localhost (http://localhost:3000)
 color 0B
 cd /d "%~dp0"
 cls
 
 echo ================================================================
-echo       CAFE BANANI / BD HOSTT POS - LOCALHOST SERVER
+echo          MASTER ERP / BD HOSTT POS - LOCALHOST SERVER
 echo ================================================================
 echo.
 echo Checking Node.js...
